@@ -9,9 +9,17 @@
 
 __sets = {}
 
+from datasets.caltech import caltech
 from datasets.pascal_voc import pascal_voc
 from datasets.coco import coco
 import numpy as np
+
+
+#Set up Caltech
+    #I need an (2007+12)  in here
+for split in ['train', 'val', 'trainval', 'test']:         #I need an all in here meaning that I will conain both data1
+    name = 'caltech_{}'.format(split)
+    __sets[name] = (lambda split=split : caltech(split))
 
 # Set up voc_<year>_<split> using selective search "fast" mode
 for year in ['2007', '2012',"0712"]:        #I need an (2007+12)  in here
