@@ -107,9 +107,10 @@ class caltech(imdb):
         image_index = []
         
         for set_num in self._annotation:
-            for v_num in self._annotation[set_num]:
-                for frame_num in self._annotation[set_num][v_num]["frames"]:
-                    image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
+            if set_num in image_set_list:
+                for v_num in self._annotation[set_num]:
+                    for frame_num in self._annotation[set_num][v_num]["frames"]:
+                        image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
                     
        
        
