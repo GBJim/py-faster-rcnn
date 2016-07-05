@@ -5,6 +5,10 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+#This is negative_ignore version of imdb class for Caltech Pedestrian dataset
+
+
+
 import os
 from datasets.imdb import imdb
 import datasets.ds_utils as ds_utils
@@ -32,6 +36,13 @@ class caltech(imdb):
         self._classes = ('__background__', # always index 0
                          'person')
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
+        annotation_path = os.path.join(self._data_path, "annotations.json")
+        assert os.path.exists(annotation_path), \
+                'Annotation path does not exist.: {}'.format(annotation_path)
+
+        self._annotation = json.load(open(annotation_path))
+        
+        
         self._image_ext = '.jpg'
         self._image_index = self._load_image_set_index()
         # Default to roidb handler
@@ -40,11 +51,7 @@ class caltech(imdb):
         #
 
 
-        annotation_path = os.path.join(self._data_path, "annotations.json")
-        assert os.path.exists(annotation_path), \
-                'Annotation path does not exist.: {}'.format(annotation_path)
-
-        self._annotation = json.load(open(annotation_path))
+       
         '''
         # Caltech Pedestrain specific config options
         self.config = {'cleanup'     : True,
@@ -72,11 +79,15 @@ class caltech(imdb):
         """
        
         image_path = os.path.join(self._data_path, 'images',
-                                  index+self._image_ext)
+                                  index+self._image_ext )
         assert os.path.exists(image_path), \
                 'Path does not exist: {}'.format(image_path)
         return image_path
-
+#Strategy: get the index from annotation dictionary 
+    
+   
+        
+    
     def _load_image_set_index(self):
         """
         Load the indexes listed in this dataset's image set file.
@@ -93,12 +104,15 @@ class caltech(imdb):
         image_path = os.path.join(self._data_path, 'images')
         assert os.path.exists( image_path), \
                 'Path does not exist: {}'.format( image_path)
-
-        png_files = [f for f in listdir(image_path) if isfile(join(image_path, f))]
-        #print(png_files[0])
-        #print(image_set_list)
-        image_index = [png_file.strip()[:-4] for png_file in png_files if int(png_file[3:5]) in image_set_list]
-        print(image_index[:30])
+        image_index = []
+        
+        for set_num in self._annotation:
+            for v_num in self._annotation[set_num]:
+                for frame_num in self._annotation[set_num][v_num]["frames"]:
+                    image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
+                    
+       
+       
         return image_index
 
     def _get_default_path(self):
@@ -204,14 +218,15 @@ class caltech(imdb):
         filename = os.path.join(self._data_path, "annotation.json")
         #annotation = json.load(open(filename))
         set_num, v_num, frame_num = index.split("_")
-        frame_num = frame_num[:-4]
-        bboxes = self._annotation[set_num][v_num]["frames"].get(frame_num, None)
-        if bboxes is None:
-            bboxes = [{'pos':[1,1,2,2]}]
-            cls = 0#Assigning class background to negtative example
+        #print(set_num, v_num, frame_num)
+        #print(self._annotation[set_num][v_num].keys())
+        #print(self._annotation[set_num][v_num]["frames"].keys())
+        #frame_num = int(frame_num)
+        bboxes = self._annotation[set_num][v_num]["frames"][frame_num]
+          
         
-        else:
-            cls = 1 #Assigning class Pedestrian to positive example
+   
+        
         
         num_objs = len(bboxes)
 
@@ -229,7 +244,7 @@ class caltech(imdb):
         # 
     
 
-
+        cls = 1
         # This is possitive example
         for ix, bbox in enumerate(bboxes):
             
@@ -239,11 +254,8 @@ class caltech(imdb):
             x2 = float(bbox['pos'][0] + bbox['pos'][2])
             y2 = float(bbox['pos'][1] + bbox['pos'][3])
             boxes[ix, :] = [x1, y1, x2, y2]
-            gt_classes[ix] = cls
-            
-            overlaps[ix, cls] = 0 if cls == 0 else 1.0
-          
-            
+            gt_classes[ix] = 1  #Must be pedestrian
+            overlaps[ix, cls] = 1.0
             seg_areas[ix] = (x2 - x1) * (y2 - y1)
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
