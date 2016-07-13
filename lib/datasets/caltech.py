@@ -8,7 +8,7 @@
 #This is negative_ignore version of imdb class for Caltech Pedestrian dataset
 
 
-
+import re
 import os
 from datasets.imdb import imdb
 import datasets.ds_utils as ds_utils
@@ -24,11 +24,17 @@ from fast_rcnn.config import cfg
 import json
 from os import listdir
 from os.path import isfile, join
+from fast_rcnn.test import im_detect
+from fast_rcnn.nms_wrapper import nms
+from utils.timer import Timer
+
 
 class caltech(imdb):
     def __init__(self, image_set, devkit_path="caltech-pedestrian-dataset-converter"):
         imdb.__init__(self,'caltech_pedestrian_' + image_set)
         #self._year = year
+        
+        self.config = {"include_all_classes":False, "include_background": False}
         self._image_set = image_set
         self._devkit_path = self._get_default_path() if devkit_path is None \
                             else devkit_path
@@ -39,6 +45,7 @@ class caltech(imdb):
         annotation_path = os.path.join(self._data_path, "annotations.json")
         assert os.path.exists(annotation_path), \
                 'Annotation path does not exist.: {}'.format(annotation_path)
+         
 
         self._annotation = json.load(open(annotation_path))
         
@@ -105,12 +112,20 @@ class caltech(imdb):
         assert os.path.exists( image_path), \
                 'Path does not exist: {}'.format( image_path)
         image_index = []
-        
+	print("TrainVal Set:")
+        print(image_set_list)
+	
         for set_num in self._annotation:
-            if set_num in image_set_list:
+            if int(set_num[3:]) in image_set_list:
+		print("Loading: {}".format(set_num))
                 for v_num in self._annotation[set_num]:
                     for frame_num in self._annotation[set_num][v_num]["frames"]:
-                        image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
+                        if self.config["include_all_classes"]:
+                            image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
+                        else:
+                            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
+                            if any(box['lbl'] == "person" for box in boxes):
+                                image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
                     
        
        
@@ -224,6 +239,10 @@ class caltech(imdb):
         #print(self._annotation[set_num][v_num]["frames"].keys())
         #frame_num = int(frame_num)
         bboxes = self._annotation[set_num][v_num]["frames"][frame_num]
+        
+        if not self.config["include_all_classes"]:
+            #print("Filter out non-person classes")
+            bboxes = [bbox for bbox in bboxes if bbox['lbl'] == "person"]
           
         
    
@@ -249,7 +268,7 @@ class caltech(imdb):
         # This is possitive example
         for ix, bbox in enumerate(bboxes):
             
-            
+
             x1 = float(bbox['pos'][0])
             y1 = float(bbox['pos'][1])
             x2 = float(bbox['pos'][0] + bbox['pos'][2])
@@ -276,24 +295,134 @@ class caltech(imdb):
             'results',
             filename)
         return path
+    # This method write results files into Evaluation toolkit format
+    def _write_caltech_results_file(self, net):
+         
+        #Insert my code in the following space
+        
+        # The follwing nested fucntions are for smart sorting
+        def atoi(text):
+            return int(text) if text.isdigit() else text
 
-    def _write_caltech_results_file(self, all_boxes):
-        for cls_ind, cls in enumerate(self.classes):
-            if cls == '__background__':
-                continue
-            print 'Writing {} Caltech results file'.format(cls)
-            filename = self._get_caltech_results_file_template().format(cls)
-            with open(filename, 'wt') as f:
-                for im_ind, index in enumerate(self.image_index):
-                    dets = all_boxes[cls_ind][im_ind]
-                    if dets == []:
-                        continue
-                    # the VOCdevkit expects 1-based indices
-                    for k in xrange(dets.shape[0]):
-                        f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                                format(index, dets[k, -1],
-                                       dets[k, 0] + 1, dets[k, 1] + 1,
-                                       dets[k, 2] + 1, dets[k, 3] + 1))
+        def natural_keys(text):
+            '''
+            alist.sort(key=natural_keys) sorts in human order
+            http://nedbatchelder.com/blog/200712/human_sorting.html
+            (See Toothy's implementation in the comments)
+            '''
+            return [ atoi(c) for c in re.split('(\d+)', text) ]
+        
+        def insert_frame(target_frames, file_path,start_frame=30, frame_rate=30):
+            file_name = file_path.split("/")[-1]
+            set_num, v_num, frame_num = file_name[:-4].split("_")
+            if int(frame_num) >= start_frame and int(frame_num) % frame_rate == 0:
+                target_frames.setdefault(set_num,{}).setdefault(v_num,[]).append(file_path)
+                return 1
+            else:
+                return 0
+       
+        
+       
+        
+            
+            
+        
+        
+        
+                    
+          
+        def detect(file_path,  NMS_THRESH = 0.3):
+            im = cv2.imread(file_path)
+            scores, boxes = im_detect(net, im)
+            cls_scores = scores[: ,1]
+            cls_boxes = boxes[:, 4:8]
+            dets = np.hstack((cls_boxes,cls_scores[:, np.newaxis])).astype(np.float32)
+            keep = nms(dets, NMS_THRESH)
+            return dets[keep, :]
+             
+        
+        def get_target_frames(image_set_list,  image_path):
+            target_frames = {}
+            total_frames = 0 
+            for set_num in image_set_list:
+                file_pattern = "{}/set{}_V*".format(image_path,set_num)
+                file_list = sorted(glob.glob(file_pattern), key=natural_keys)
+                for file_path in file_list:
+                    total_frames += insert_frame(target_frames, file_path)
+                
+            return target_frames, total_frames 
+        
+        def detection_to_file(target_path, v_num, file_list, detect,total_frames, current_frames, max_proposal=100, thresh=0):
+            timer = Timer()
+            w = open("{}/{}.txt".format(target_path, v_num), "w")
+            for file_index, file_path in enumerate(file_list):
+                file_name = file_path.split("/")[-1]
+                set_num, v_num, frame_num = file_name[:-4].split("_")
+                
+                timer.tic()
+                dets = detect(file_path)
+                timer.toc()
+                 
+                print('Detection Time:{:.3f}s  {}/{} images'.format(timer.average_time, current_frames+file_index+1 , total_frames))
+                
+                             
+                inds = np.where(dets[:, -1] >= thresh)[0]     
+                for i in inds:
+                    bbox = dets[i, :4]
+                    score = dets[i, -1]
+            
+                    x = bbox[0]
+                    y = bbox[1] 
+                    width = bbox[2] - x 
+                    length =  bbox[3] - y
+                    w.write("{},{},{},{},{},{}\n".format(frame_num, x, y, width, length, score*100))
+                    
+               
+            w.close()
+            print("Evalutaion file {} has been writen".format(w.name))   
+            return file_index + 1
+               
+            
+            
+                        
+        model_name = net.name
+        output_path = os.path.join(self._data_path,"res" , model_name)
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)       
+            
+        
+        
+        image_set_list = self._load_image_set_list()
+   
+        
+        
+        image_path = os.path.join(self._data_path, 'images')
+        assert os.path.exists(image_path),'Path does not exist: {}'.format(image_path)
+        target_frames, total_frames = get_target_frames(image_set_list,  image_path)
+        
+       
+        
+        
+        
+        
+        current_frames = 0
+        for set_num in target_frames:
+            target_path = os.path.join(output_path, set_num)
+            if not os.path.exists(target_path):
+                os.makedirs(target_path)
+            for v_num, file_list in target_frames[set_num].items():
+                current_frames += detection_to_file(target_path, v_num, file_list, detect, total_frames, current_frames)
+                
+       
+        
+        
+
+                        
+                        
+                        
+                        
+                        
+                        
 
     def _do_python_eval(self, output_dir = 'output'):
         annopath = os.path.join(
