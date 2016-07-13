@@ -241,8 +241,10 @@ class caltech(imdb):
         bboxes = self._annotation[set_num][v_num]["frames"][frame_num]
         
         if not self.config["include_all_classes"]:
-            #print("Filter out non-person classes")
+           
             bboxes = [bbox for bbox in bboxes if bbox['lbl'] == "person"]
+            if bbox['lbl'] != "person":
+                print("Filter out non-person classes")
           
         
    

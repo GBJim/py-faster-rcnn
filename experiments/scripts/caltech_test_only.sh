@@ -43,7 +43,7 @@ case $DATASET in
     # You can probably use fewer iterations and reduce the
     # time to the LR drop (set in the solver to 350,000 iterations).
     TRAIN_IMDB="caltech_trainval"
-    TEST_IMDB="test"
+    TEST_IMDB="caltech_test"
    
     PT_DIR="caltech"
     ITERS=490000
@@ -61,7 +61,7 @@ echo Logging output to "$LOG"
   
 
 set +x
-NET_FINAL= $4
+NET_FINAL=$4
 set -x
     
     time ./tools/test_net.py --gpu ${GPU_ID} \
