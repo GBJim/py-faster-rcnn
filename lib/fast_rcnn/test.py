@@ -227,7 +227,7 @@ def apply_nms(all_boxes, thresh):
 def test_net(net, imdb, max_per_image=100, thresh=0.05, vis=False):
     """Test a Fast R-CNN network on an image database."""
     print(imdb.name)
-    if imdb.name == 'caltech_pedestrian':
+    if imdb.name == 'caltech_pedestrian_test':
         print("Start to write detection results")
         imdb._write_caltech_results_file(net)
         return

@@ -27,7 +27,8 @@ from os.path import isfile, join
 from fast_rcnn.test import im_detect
 from fast_rcnn.nms_wrapper import nms
 from utils.timer import Timer
-
+import glob
+import cv2
 
 class caltech(imdb):
     def __init__(self, image_set, devkit_path="caltech-pedestrian-dataset-converter"):
@@ -93,6 +94,13 @@ class caltech(imdb):
 #Strategy: get the index from annotation dictionary 
     
    
+    def _load_image_set_list(self):
+        image_set_file = os.path.join(self._data_path,
+                                      self._image_set + '.txt')
+        assert os.path.exists(image_set_file), \
+                'Path does not exist: {}'.format(image_set_file)
+        f = open(image_set_file)
+        return  [line.strip() for line in f]
         
     
     def _load_image_set_index(self):
@@ -101,12 +109,9 @@ class caltech(imdb):
         """
         # Example path to image set file:
         # self._devkit_path + /VOCdevkit2007/VOC2007/ImageSets/Main/val.txt
-        image_set_file = os.path.join(self._data_path,
-                                      self._image_set + '.txt')
-        assert os.path.exists(image_set_file), \
-                'Path does not exist: {}'.format(image_set_file)
-        f = open(image_set_file)
-        image_set_list = [int(line.strip()) for line in f]
+       
+        image_set_list = [int(image_set_num) for image_set_num  in self._load_image_set_list()]
+        
         
         image_path = os.path.join(self._data_path, 'images')
         assert os.path.exists( image_path), \
@@ -363,6 +368,7 @@ class caltech(imdb):
                 
                 timer.tic()
                 dets = detect(file_path)
+               
                 timer.toc()
                  
                 print('Detection Time:{:.3f}s  {}/{} images'.format(timer.average_time, current_frames+file_index+1 , total_frames))
