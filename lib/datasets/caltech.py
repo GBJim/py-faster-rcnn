@@ -300,8 +300,8 @@ class caltech(imdb):
         if not self.config["include_all_classes"]:
            
             bboxes = [bbox for bbox in bboxes if reasonable_verify(bbox)]
-            if bbox['lbl'] != "person":
-                print("Filter out non-person classes")
+            if not reasonable_verify(bbox):
+                print("Filter out non resonable box")
           
         
    
