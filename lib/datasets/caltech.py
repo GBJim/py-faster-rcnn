@@ -104,6 +104,30 @@ class caltech(imdb):
         
     
     def _load_image_set_index(self):
+         
+        def reasonable_verify(box):
+            def verity_bnds(pos):
+                bnds = [5, 5, 635, 475]
+                return pos[0] >= bnds[0] and pos[0] + pos[2] <= bnds[2] and pos[1] >= bnds[1] and pos[1] +pos[3]<= bnds[3] 
+
+            height_min = 50
+            visiable_min = .65
+            pos = box['pos']
+            pos_v = box['posv']
+            occl = box['occl']
+            label = box["lbl"]
+            if label != "person":
+                return False
+
+            pos_area = pos[2] * pos[3]
+            try:
+                if occl == 0 or all(x==0 for x in pos_v):
+                    return True
+                pos_v_area = pos_v[2] * pos_v[3]
+                visiable_ratio = (pos_v_area / pos_area)
+            except:
+                return False
+            return visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos)
         """
         Load the indexes listed in this dataset's image set file.
         """
@@ -129,7 +153,7 @@ class caltech(imdb):
                             image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
                         else:
                             boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-                            if any(box['lbl'] == "person" for box in boxes):
+                            if any(reasonable_verify(box) for box in boxes):
                                 image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
                     
        
@@ -232,6 +256,34 @@ class caltech(imdb):
 
     #Assign negtaive example to __background__ as whole image
     def _load_caltech_annotation(self, index):
+        
+ 
+        def reasonable_verify(box):
+            def verity_bnds(pos):
+                bnds = [5, 5, 635, 475]
+                return pos[0] >= bnds[0] and pos[0] + pos[2] <= bnds[2] and pos[1] >= bnds[1] and pos[1] +pos[3]<= bnds[3] 
+
+            height_min = 50
+            visiable_min = .65
+            pos = box['pos']
+            pos_v = box['posv']
+            occl = box['occl']
+            label = box["lbl"]
+            if label != "person":
+                return False
+
+            pos_area = pos[2] * pos[3]
+            try:
+                if occl == 0 or all(x==0 for x in pos_v):
+                    return True
+                pos_v_area = pos_v[2] * pos_v[3]
+                visiable_ratio = (pos_v_area / pos_area)
+            except:
+                return False
+            return visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos)
+    
+    
+
         """
         Load image and bounding boxes info from XML file in the PASCAL VOC
         format.
@@ -247,7 +299,7 @@ class caltech(imdb):
         
         if not self.config["include_all_classes"]:
            
-            bboxes = [bbox for bbox in bboxes if bbox['lbl'] == "person"]
+            bboxes = [bbox for bbox in bboxes if reasonable_verify(bbox)]
             if bbox['lbl'] != "person":
                 print("Filter out non-person classes")
           

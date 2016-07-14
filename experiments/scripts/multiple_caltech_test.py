@@ -12,4 +12,4 @@ for model in models:
     command = ["bash", script_path, GPU_ID, net, imdb, model]
     
     call(command)
-    break
+    
