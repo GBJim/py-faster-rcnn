@@ -32,7 +32,7 @@ import cv2
 
 class caltech(imdb):
     def __init__(self, version, image_set, devkit_path="caltech-pedestrian-dataset-converter"):
-        imdb.__init__(self,'caltech_pedestrian_' + image_set)
+        imdb.__init__(self,'caltech_pedestrian' + image_set)
         self.version = version
         
         self.config = {"include_all_classes":False, "include_background": False}
@@ -103,34 +103,10 @@ class caltech(imdb):
         return  [line.strip() for line in f]
     
     
-       
-    def all_index(self, image_set_list):
-        image_index = []        
-        for set_num in self._annotation:
-            if int(set_num[3:]) in image_set_list:
-                print("Loading: {}".format(set_num))
-                for v_num in self._annotation[set_num]:
-                    for frame_num in self._annotation[set_num][v_num]["frames"]:
-                        image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
-                     
-        return image_index                   
-                    
-      
-    def person_class_index(self, image_set_list):
-        image_index = self.all_index(image_set_list)
-        target_index = []
-        for image_name in image_index :
-            set_num, v_num, frame_num =  image_name.split("_")
-            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(box["lbl"] == "person" for box in boxes):
-                target_index.append(image_name)
-     
-                     
-        return target_index                   
+   
     
     
-    
-    def reasonable_index(self, image_set_list):
+    def reasonable_index(image_set_list):
            
         def reasonable_verify(box):
             def verity_bnds(pos):
@@ -143,7 +119,8 @@ class caltech(imdb):
             pos_v = box['posv']
             occl = box['occl']
             label = box["lbl"]
-         
+            if label != "person":
+                return False
 
             pos_area = pos[2] * pos[3]
             try:
@@ -155,24 +132,64 @@ class caltech(imdb):
                 return False
             return visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos)
         
-        image_index = self.person_class_index(image_set_list)
-        target_index = []
-
-        for image_name in image_index :
-            set_num, v_num, frame_num =  image_name.split("_")
-            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(box["lbl"] == "person" for box in boxes):
-                target_index.append(image_name)
-        
-        
-        
-        
-        
+        for set_num in self._annotation:
+            if int(set_num[3:]) in image_set_list:
+                print("Loading: {}".format(set_num))
+                for v_num in self._annotation[set_num]:
+                    for frame_num in self._annotation[set_num][v_num]["frames"]:
+                        if self.config["include_all_classes"]:
+                            image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
+                        else:
+                            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
+                            if any(reasonable_verify(box) for box in boxes):
+                                image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
                                 
-        return target_index                   
+        return image_index                   
                     
         
+ 
+        
+    
+    
+    
+    def all_index(image_set_list):
+                
+        for set_num in self._annotation:
+            if int(set_num[3:]) in image_set_list:
+                print("Loading: {}".format(set_num))
+                for v_num in self._annotation[set_num]:
+                    for frame_num in self._annotation[set_num][v_num]["frames"]:
+                        image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
+                     
+        return image_index                   
+                    
+    
+    
+    
+    
+    
+    
+   
+    def person_class_index():
+          for set_num in self._annotation:
+            if int(set_num[3:]) in image_set_list:
+                print("Loading: {}".format(set_num))
+                for v_num in self._annotation[set_num]:
+                    for frame_num in self._annotation[set_num][v_num]["frames"]:
+                        if any(box["lbl"] == "person" for box in boxes):
+                            image_index.append("{}_{}_{}".format(set_num, v_num, frame_num))
+                        
+                     
+        return image_index                   
+    
+    
+    
+    
+    
 
+    
+        
+    
     def _load_image_set_index(self):
       
         """
@@ -195,7 +212,7 @@ class caltech(imdb):
 	           
                                 
         method_mapper = {"reasonable":self.reasonable_index, "all": self.all_index, "person_class":\
-                         self.person_class_index}                        
+                         self.person_calss_index}                        
                         
         image_index = method_mapper[self.version](image_set_list)          
        
@@ -301,7 +318,14 @@ class caltech(imdb):
         return self.create_roidb_from_box_list(box_list, gt_roidb)
     
 
-  
+    
+    
+        
+ 
+        
+        
+        
+    
     
     
     
@@ -315,7 +339,7 @@ class caltech(imdb):
             
     
         def verify_reasonable(box):
-            def verity_bnds(pos):
+             def verity_bnds(pos):
                 bnds = [5, 5, 635, 475]
                 return pos[0] >= bnds[0] and pos[0] + pos[2] <= bnds[2] and pos[1] >= bnds[1] and pos[1] +pos[3]<= bnds[3] 
 
@@ -357,10 +381,9 @@ class caltech(imdb):
         
         verify_methods = {"person_class_only":verify_person_class, "reasonable":verify_reasonable, "all": verify_all  }
         verify_method = verify_methods[self.version]
-        
-        bboxes = [bbox for bbox in bboxes if verify_method(box) ]
-        if not reasonable_verify(bbox):
-            print("Filter out non {} boxes".foramt(self.version))
+            bboxes = [bbox for bbox in bboxes if verify_method(box) ]
+            if not reasonable_verify(bbox):
+                print("Filter out non {} boxes".foramt(self.version))
           
         
    
@@ -414,7 +437,7 @@ class caltech(imdb):
             filename)
         return path
     # This method write results files into Evaluation toolkit format
-    def _write_caltech_results_file(self, net):
+    def _write_caltech_results_file(self, net, ourput_dir):
          
         #Insert my code in the following space
         
@@ -505,7 +528,7 @@ class caltech(imdb):
             
                         
         model_name = net.name
-        output_path = os.path.join(self._data_path,"res" , self.version, model_name)
+        output_path = os.path.join(self._data_path,"res" , model_name)
         if not os.path.exists(output_path):
             os.makedirs(output_path)       
             
