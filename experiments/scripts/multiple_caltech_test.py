@@ -16,10 +16,17 @@ imdb = "caltech_{}".format(version)
 script_path = "experiments/scripts/caltech_test_only.sh"
 
 
+get_iterations = lambda model: int(model.split("_")[-1][:-11])
+#lower_bound = 60000
+#upper_bound = 100000
+target = 110000
 for model in models:
     
     command = ["bash", script_path, GPU_ID, net, imdb, model]
-    print(" ".join(command))
-    call(command)
+    iterations = get_iterations(model)
+    #if iterations > lower_bound and iterations < upper_bound:
+    if iterations == target: 	
+        print("Starting Evaluating iterations: {}".format(iterations))
+        call(command)
     
     

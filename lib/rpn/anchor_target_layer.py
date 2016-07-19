@@ -129,6 +129,7 @@ class AnchorTargetLayer(caffe.Layer):
 
         # overlaps between the anchors and the gt boxes
         # overlaps (ex, gt)
+        
         overlaps = bbox_overlaps(
             np.ascontiguousarray(anchors, dtype=np.float),
             np.ascontiguousarray(gt_boxes, dtype=np.float))
@@ -160,6 +161,7 @@ class AnchorTargetLayer(caffe.Layer):
             disable_inds = npr.choice(
                 fg_inds, size=(len(fg_inds) - num_fg), replace=False)
             labels[disable_inds] = -1
+        
 
         # subsample negative labels if we have too many
         num_bg = cfg.TRAIN.RPN_BATCHSIZE - np.sum(labels == 1)

@@ -27,6 +27,8 @@ def prepare_roidb(imdb):
         roidb[i]['image'] = imdb.image_path_at(i)
         roidb[i]['width'] = sizes[i][0]
         roidb[i]['height'] = sizes[i][1]
+        if not "boxes" in roidb[i]:
+            continue
         # need gt_overlaps as a dense array for argmax
         gt_overlaps = roidb[i]['gt_overlaps'].toarray()
         # max overlap with gt over classes (columns)
@@ -52,6 +54,8 @@ def add_bbox_regression_targets(roidb):
     # Infer number of classes from the number of columns in gt_overlaps
     num_classes = roidb[0]['gt_overlaps'].shape[1]
     for im_i in xrange(num_images):
+        if "boxes" not in roidb[im_i]:
+            continue
         rois = roidb[im_i]['boxes']
         max_overlaps = roidb[im_i]['max_overlaps']
         max_classes = roidb[im_i]['max_classes']
@@ -94,6 +98,8 @@ def add_bbox_regression_targets(roidb):
     if cfg.TRAIN.BBOX_NORMALIZE_TARGETS:
         print "Normalizing targets"
         for im_i in xrange(num_images):
+            if not 'bbox_targets' in roidb[im_i]:
+                continue
             targets = roidb[im_i]['bbox_targets']
             for cls in xrange(1, num_classes):
                 cls_inds = np.where(targets[:, 0] == cls)[0]

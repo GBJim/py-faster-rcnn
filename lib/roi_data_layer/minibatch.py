@@ -29,21 +29,33 @@ def get_minibatch(roidb, num_classes):
     im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
 
     blobs = {'data': im_blob}
-
+    
     if cfg.TRAIN.HAS_RPN:
+        
         assert len(im_scales) == 1, "Single batch only"
         assert len(roidb) == 1, "Single batch only"
         # gt boxes: (x1, y1, x2, y2, cls)
-        gt_inds = np.where(roidb[0]['gt_classes'] != 0)[0]
-        gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
-        gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
-        gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
-        blobs['gt_boxes'] = gt_boxes
+        if 'gt_classes' not in roidb[0] or roidb[0]['gt_classes'].shape[0] ==0:
+            print("Negative Examples")
+            blobs['gt_boxes'] = np.zeros((1,5), dtype=np.float32)
+        else:
+            print("Positive Examples")
+            gt_inds = np.where(roidb[0]['gt_classes'] != 0)[0]
+
+            gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
+            gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
+            gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
+            if gt_boxes == np.array([]):
+                blobs['gt_boxes'] = np.ones((3,5), dtype=np.float32)
+            else:
+                blobs['gt_boxes'] = gt_boxes
+
         blobs['im_info'] = np.array(
             [[im_blob.shape[2], im_blob.shape[3], im_scales[0]]],
             dtype=np.float32)
     else: # not using RPN
         # Now, build the region of interest and label blobs
+        
         rois_blob = np.zeros((0, 5), dtype=np.float32)
         labels_blob = np.zeros((0), dtype=np.float32)
         bbox_targets_blob = np.zeros((0, 4 * num_classes), dtype=np.float32)
@@ -77,7 +89,7 @@ def get_minibatch(roidb, num_classes):
             blobs['bbox_inside_weights'] = bbox_inside_blob
             blobs['bbox_outside_weights'] = \
                 np.array(bbox_inside_blob > 0).astype(np.float32)
-
+    print(blobs['gt_boxes'] )
     return blobs
 
 def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):

@@ -181,7 +181,7 @@ class caltech(imdb):
         # Example path to image set file:
         # self._devkit_path + /VOCdevkit2007/VOC2007/ImageSets/Main/val.txt
        
-        image_set_list = [int(image_set_num) for image_set_num  in self._load_image_set_list()]
+        image_set_list = [image_set_num for image_set_num  in self._load_image_set_list()]
         
         
         image_path = os.path.join(self._data_path, 'images')
@@ -190,14 +190,23 @@ class caltech(imdb):
         image_index = []
 
         print(image_set_list)
+        images_dir = os.path.join(self._data_path, 'images')
+        
+        image_files = [image_file for image_file in listdir(images_dir) if isfile(join(images_dir, image_file))]
+        
+        image_index= [image_file[:-4] for image_file in image_files if image_file[3:5] in image_set_list]
+        
+        
+        print("{} images on training process".format(len(image_index)))
+        
         
         
 	           
                                 
-        method_mapper = {"reasonable":self.reasonable_index, "all": self.all_index, "person_class":\
-                         self.person_class_index}                        
+        #method_mapper = {"reasonable":self.reasonable_index, "all": self.all_index, "person_class":\
+        #                 self.person_class_index}                        
                         
-        image_index = method_mapper[self.version](image_set_list)          
+        #image_index = method_mapper[self.version](image_set_list)          
        
        
         return image_index
@@ -250,7 +259,7 @@ class caltech(imdb):
             print '{} ss roidb loaded from {}'.format(self.name, cache_file)
             return roidb
 
-        if int(self._year) == 2007 or self._image_set != 'test':
+        if self._image_set != 'test':
             gt_roidb = self.gt_roidb()
             ss_roidb = self._load_selective_search_roidb(gt_roidb)
             roidb = imdb.merge_roidbs(gt_roidb, ss_roidb)
@@ -263,7 +272,7 @@ class caltech(imdb):
         return roidb
 
     def rpn_roidb(self):
-        if int(self._year) == 2007 or self._image_set != 'test':
+        if self._image_set != 'test':
             gt_roidb = self.gt_roidb()
             rpn_roidb = self._load_rpn_roidb(gt_roidb)
             roidb = imdb.merge_roidbs(gt_roidb, rpn_roidb)
@@ -353,14 +362,16 @@ class caltech(imdb):
         filename = os.path.join(self._data_path, "annotation.json")
         #annotation = json.load(open(filename))
         set_num, v_num, frame_num = index.split("_")
+        if not frame_num in self._annotation[set_num][v_num]["frames"]:
+            return { 'flipped' : False}
         bboxes = self._annotation[set_num][v_num]["frames"][frame_num]
         
         verify_methods = {"person_class_only":verify_person_class, "reasonable":verify_reasonable, "all": verify_all  }
         verify_method = verify_methods[self.version]
         
-        bboxes = [bbox for bbox in bboxes if verify_method(box) ]
-        if not reasonable_verify(bbox):
-            print("Filter out non {} boxes".foramt(self.version))
+        bboxes = [bbox for bbox in bboxes if verify_method(bbox) ]
+        if not verify_reasonable(bbox):
+            print("Filter out non {} boxes".format(self.version))
           
         
    
