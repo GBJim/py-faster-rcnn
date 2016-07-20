@@ -358,9 +358,9 @@ class caltech(imdb):
         verify_methods = {"person_class_only":verify_person_class, "reasonable":verify_reasonable, "all": verify_all  }
         verify_method = verify_methods[self.version]
         
-        bboxes = [bbox for bbox in bboxes if verify_method(box) ]
-        if not reasonable_verify(bbox):
-            print("Filter out non {} boxes".foramt(self.version))
+        bboxes = [bbox for bbox in bboxes if verify_method(bbox) ]
+        if not verify_reasonable(bbox):
+            print("Filter out non {} boxes".format(self.version))
           
         
    
