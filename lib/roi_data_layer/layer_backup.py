@@ -16,7 +16,7 @@ from roi_data_layer.minibatch import get_minibatch
 import numpy as np
 import yaml
 from multiprocessing import Process, Queue
-#I need to modify this layer, enable a stggering permutation
+
 class RoIDataLayer(caffe.Layer):
     """Fast R-CNN data layer used for training."""
 
@@ -42,16 +42,12 @@ class RoIDataLayer(caffe.Layer):
 
     def _get_next_minibatch_inds(self):
         """Return the roidb indices for the next minibatch."""
-        if self._cur == 0 or self._cur + cfg.TRAIN.IMS_PER_BATCH >= len(self._roidb):
+        if self._cur + cfg.TRAIN.IMS_PER_BATCH >= len(self._roidb):
             self._shuffle_roidb_inds()
 
         db_inds = self._perm[self._cur:self._cur + cfg.TRAIN.IMS_PER_BATCH]
         self._cur += cfg.TRAIN.IMS_PER_BATCH
         return db_inds
-    
-    
-
-    
 
     def _get_next_minibatch(self):
         """Return the blobs to be used for the next minibatch.
@@ -59,28 +55,12 @@ class RoIDataLayer(caffe.Layer):
         If cfg.TRAIN.USE_PREFETCH is True, then blobs will be computed in a
         separate process and made available through self._blob_queue.
         """
-        STAGGERED = True
-        
-        if 'self.current_polarity' not in locals():
-            self.current_polarity = 1
-        
         if cfg.TRAIN.USE_PREFETCH:
             return self._blob_queue.get()
-            
-            
         else:
             db_inds = self._get_next_minibatch_inds()
             minibatch_db = [self._roidb[i] for i in db_inds]
-            if STAGGERED:
-                next_polarity = 1 if ["gt_boxes"] in minibatch_db[0] or minibatch_db[0]["gt_boxes"] == [] else -1
-                while(next_polarity == self.current_polarity ):
-                    db_inds = self._get_next_minibatch_inds()
-                    minibatch_db = [self._roidb[i] for i in db_inds]
-                    next_polarity = 1 if ["gt_boxes"] in minibatch_db[0] or minibatch_db[0]["gt_boxes"] == [] else -1
-                    
-                self.current_polarity *= -1
-            else:
-                return get_minibatch(minibatch_db, self._num_classes)
+            return get_minibatch(minibatch_db, self._num_classes)
 
     def set_roidb(self, roidb):
         """Set the roidb to be used by this layer during training."""
