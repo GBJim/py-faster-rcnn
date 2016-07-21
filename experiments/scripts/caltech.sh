@@ -47,6 +47,16 @@ case $DATASET in
     PT_DIR="caltech"
     ITERS=490000
     ;;
+    caltech_reasonable)
+    # This is a very long and slow training schedule
+    # You can probably use fewer iterations and reduce the
+    # time to the LR drop (set in the solver to 350,000 iterations).
+    TRAIN_IMDB="caltech_reasonable_trainval"
+    TEST_IMDB="caltech_reasonable_test"
+   
+    PT_DIR="caltech"
+    ITERS=490000
+    ;;
   *)
     echo "No dataset given"
     exit
