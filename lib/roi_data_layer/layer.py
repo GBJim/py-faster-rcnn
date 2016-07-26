@@ -43,6 +43,7 @@ class RoIDataLayer(caffe.Layer):
     def _get_next_minibatch_inds(self):
         """Return the roidb indices for the next minibatch."""
         if self._cur == 0 or self._cur + cfg.TRAIN.IMS_PER_BATCH >= len(self._roidb):
+	    print("Data Shuffled")
             self._shuffle_roidb_inds()
 
         db_inds = self._perm[self._cur:self._cur + cfg.TRAIN.IMS_PER_BATCH]
@@ -61,9 +62,10 @@ class RoIDataLayer(caffe.Layer):
         """
         STAGGERED = True
         
-        if not hasattr(self, 'current_polarity'):
-	    print("Set current_polarity value")
-            self.current_polarity = 1
+        if not hasattr(self, 'positive_energy'):
+	    print("Set positive_energy value")
+            self.energy_threshold = 10 #20
+	    self.positive_energy = 0
         
         if cfg.TRAIN.USE_PREFETCH:
             return self._blob_queue.get()
@@ -74,14 +76,16 @@ class RoIDataLayer(caffe.Layer):
             minibatch_db = [self._roidb[i] for i in db_inds]
             if STAGGERED:
                 next_polarity = -1 if "gt_classes" not in minibatch_db[0] or minibatch_db[0]["gt_classes"].shape[0] == 0 else 1
-                while(next_polarity == self.current_polarity ):
+                while(next_polarity == -1 and  self.positive_energy <= self.energy_threshold):
                     db_inds = self._get_next_minibatch_inds()
                     minibatch_db = [self._roidb[i] for i in db_inds]
                     next_polarity = -1 if "gt_classes" not in minibatch_db[0] or minibatch_db[0]["gt_classes"].shape[0] == 0 else 1
+		energy = 1 if next_polarity > 0 else -self.energy_threshold
+		self.positive_energy += energy
                     
-                self.current_polarity *= -1
+                
 		
-            print(self.current_polarity)
+            print(self.positive_energy)
             return get_minibatch(minibatch_db, self._num_classes)
 
     def set_roidb(self, roidb):
