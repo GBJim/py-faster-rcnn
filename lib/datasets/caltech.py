@@ -131,8 +131,11 @@ class caltech(imdb):
     
     
     def reasonable_index(self, image_set_list):
+        def verify_person_class(box):
+            return box['lbl'] == 'person'
+            
            
-        def reasonable_verify(box):
+        def verify_reasonable(box):
             def verity_bnds(pos):
                 bnds = [5, 5, 635, 475]
                 return pos[0] >= bnds[0] and pos[0] + pos[2] <= bnds[2] and pos[1] >= bnds[1] and pos[1] +pos[3]<= bnds[3] 
@@ -143,17 +146,20 @@ class caltech(imdb):
             pos_v = box['posv']
             occl = box['occl']
             label = box["lbl"]
-         
+        
 
             pos_area = pos[2] * pos[3]
-            try:
-                if occl == 0 or all(x==0 for x in pos_v):
-                    return True
+
+      
+            if occl == 0 or not hasattr(pos_v, '__iter__') or all(x==0 for x in pos_v):
+
+                visiable_ratio = 1
+            else:
                 pos_v_area = pos_v[2] * pos_v[3]
                 visiable_ratio = (pos_v_area / pos_area)
-            except:
-                return False
-            return visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos)
+         
+            return verify_person_class(box) and visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos) 
+        
         
         image_index = self.person_class_index(image_set_list)
         target_index = []
@@ -161,12 +167,12 @@ class caltech(imdb):
         for image_name in image_index :
             set_num, v_num, frame_num =  image_name.split("_")
             boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(box["lbl"] == "person" for box in boxes):
+            if any(verify_reasonable(box) for box in boxes):
                 target_index.append(image_name)
         
+  
         
-        
-        
+
         
                                 
         return target_index                   
@@ -215,7 +221,7 @@ class caltech(imdb):
 
     def gt_roidb(self):
         """
-        Return the database of ground-truth regions of interest.
+        Return the database of ground-truth regions of interest.caltech_imdb._load_caltech_annotation
 
         This function loads/saves from/to a cache file to speed up future calls.
         """
@@ -328,13 +334,15 @@ class caltech(imdb):
         
 
             pos_area = pos[2] * pos[3]
-            try:
-                if occl == 0 or all(x==0 for x in pos_v):
-                    return True
+
+      
+            if occl == 0 or not hasattr(pos_v, '__iter__') or all(x==0 for x in pos_v):
+
+                visiable_ratio = 1
+            else:
                 pos_v_area = pos_v[2] * pos_v[3]
                 visiable_ratio = (pos_v_area / pos_area)
-            except:
-                return False
+         
             return verify_person_class(box) and visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos) 
         
         
@@ -354,6 +362,7 @@ class caltech(imdb):
         #annotation = json.load(open(filename))
         set_num, v_num, frame_num = index.split("_")
         bboxes = self._annotation[set_num][v_num]["frames"][frame_num]
+        print(len(bboxes))
         
         verify_methods = {"person_class_only":verify_person_class, "reasonable":verify_reasonable, "all": verify_all  }
         verify_method = verify_methods[self.version]
@@ -394,6 +403,8 @@ class caltech(imdb):
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = 1  #Must be pedestrian
             overlaps[ix, cls] = 1.0
+            if (y2 - y1) < 50:
+                print("Oops!")
             seg_areas[ix] = (x2 - x1) * (y2 - y1)
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
