@@ -23,22 +23,7 @@ EXTRA_ARGS=${array[@]:3:$len}
 EXTRA_ARGS_SLUG=${EXTRA_ARGS// /_}
 
 case $DATASET in
-  pascal_voc)
-    TRAIN_IMDB="voc_0712_trainval"
-    TEST_IMDB="voc_2012_test"
-    PT_DIR="pascal_voc"
-    ITERS=70000
-    ;;
-  coco)
-    # This is a very long and slow training schedule
-    # You can probably use fewer iterations and reduce the
-    # time to the LR drop (set in the solver to 350,000 iterations).
-    TRAIN_IMDB="coco_2014_train"
-    TEST_IMDB="coco_2014_minival"
-    PT_DIR="coco"
-    ITERS=490000
-    ;;
-    caltech)
+    all)
     # This is a very long and slow training schedule
     # You can probably use fewer iterations and reduce the
     # time to the LR drop (set in the solver to 350,000 iterations).
@@ -47,12 +32,22 @@ case $DATASET in
     PT_DIR="caltech"
     ITERS=490000
     ;;
-    caltech_reasonable)
+    reasonable)
     # This is a very long and slow training schedule
     # You can probably use fewer iterations and reduce the
     # time to the LR drop (set in the solver to 350,000 iterations).
     TRAIN_IMDB="caltech_reasonable_trainval"
     TEST_IMDB="caltech_reasonable_test"
+   
+    PT_DIR="caltech"
+    ITERS=490000
+    ;;
+     person_class_only)
+    # This is a very long and slow training schedule
+    # You can probably use fewer iterations and reduce the
+    # time to the LR drop (set in the solver to 350,000 iterations).
+    TRAIN_IMDB="caltech_person_class_only"
+    TEST_IMDB="caltech_person_class_only"
    
     PT_DIR="caltech"
     ITERS=490000

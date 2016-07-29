@@ -30,6 +30,91 @@ from utils.timer import Timer
 import glob
 import cv2
 
+
+#Public functions:
+#For boxes with certain Label
+def label_filter(box, label="person"):
+    return box['lbl'] == label
+
+#For boxes with a specified boundry, the default values arefrom 
+def boundry_filter(box, bnds = {'xmin':5, 'ymin':5, 'xmax':635, 'ymax':475}):
+    x1 = box['pos'][0]
+    y1 = box['pos'][1]
+    width = box['pos'][2]
+    height = box['pos'][3]
+    x2 = x1 + width
+    y2 = y1 + height
+
+    validity =  x1 >= bnds['xmin'] and \
+                x2 <= bnds['xmax'] and \
+                y1 >= bnds['ymin'] and \
+                y2 <= bnds['ymax'] 
+
+    return validity
+
+#For boxes higher than a speifcied height
+def height_filter(box, height_range = {'min':50, 'max': float('inf')}):
+    height = box['pos'][3]
+    validity = height >= height_range['min'] and \
+               height < height_range['max']
+    return validity
+
+#For boxes more visible than a speifcied range
+def visibility_filter(box, visible_range = {'min': 0.65, 'max': float('inf')}):
+    occluded = box['occl']
+
+    #A dirty condition to deal with the ill-formatted data.
+    if occluded == 0 or \
+       not hasattr(box['posv'], '__iter__') or \
+       all([v==0 for v in box['posv']]):
+
+        visiable_ratio = 1
+
+    else:
+        width = box['pos'][2]
+        height = box['pos'][3]
+        area = width * height   
+
+        visible_width = box['posv'][2]
+        visible_height = box['posv'][3]
+        visible_area = visible_width * visible_height
+
+        visiable_ratio = visible_area / area
+
+
+
+    validity = visiable_ratio  >= visible_range['min'] and \
+           visiable_ratio  <= visible_range['max']
+
+    return validity
+
+
+
+
+
+    height = box['pos'][3]
+    validity = height >= height_range['min'] and \
+               height < height_range['max']
+    return validity
+
+
+
+
+def reasonable_filter(box):
+    label = "person"
+    validity = box['lbl'] == 'person' and\
+               boundry_filter(box) and\
+               height_filter(box) and \
+               visibility_filter(box)
+
+    return validity
+
+
+
+
+
+
+
 class caltech(imdb):
     def __init__(self, version, image_set, devkit_path="caltech-pedestrian-dataset-converter"):
         imdb.__init__(self,'caltech_pedestrian_' + image_set)
@@ -59,16 +144,7 @@ class caltech(imdb):
         #
 
 
-       
-        '''
-        # Caltech Pedestrain specific config options
-        self.config = {'cleanup'     : True,
-                       'use_salt'    : True,
-                       'use_diff'    : False,
-                       'matlab_eval' : False,
-                       'rpn_file'    : None,
-                       'min_size'    : 2}
-        '''
+    
         #not usre if I should keep this line
         #assert os.path.exists(self._devkit_path), \
         #        'VOCdevkit path does not exist: {}'.format(self._devkit_path)
@@ -131,34 +207,8 @@ class caltech(imdb):
     
     
     def reasonable_index(self, image_set_list):
-        def verify_person_class(box):
-            return box['lbl'] == 'person'
-            
-           
-        def verify_reasonable(box):
-            def verity_bnds(pos):
-                bnds = [5, 5, 635, 475]
-                return pos[0] >= bnds[0] and pos[0] + pos[2] <= bnds[2] and pos[1] >= bnds[1] and pos[1] +pos[3]<= bnds[3] 
-
-            height_min = 50
-            visiable_min = .65
-            pos = box['pos']
-            pos_v = box['posv']
-            occl = box['occl']
-            label = box["lbl"]
         
-
-            pos_area = pos[2] * pos[3]
-
-      
-            if occl == 0 or not hasattr(pos_v, '__iter__') or all(x==0 for x in pos_v):
-
-                visiable_ratio = 1
-            else:
-                pos_v_area = pos_v[2] * pos_v[3]
-                visiable_ratio = (pos_v_area / pos_area)
-         
-            return verify_person_class(box) and visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos) 
+       
         
         
         image_index = self.person_class_index(image_set_list)
@@ -167,7 +217,7 @@ class caltech(imdb):
         for image_name in image_index :
             set_num, v_num, frame_num =  image_name.split("_")
             boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(verify_reasonable(box) for box in boxes):
+            if any(reasonable_filter(box) for box in boxes):
                 target_index.append(image_name)
         
   
@@ -316,37 +366,7 @@ class caltech(imdb):
         
         
         
-        def verify_person_class(box):
-            return box['lbl'] == 'person'
-            
-    
-        def verify_reasonable(box):
-            def verity_bnds(pos):
-                bnds = [5, 5, 635, 475]
-                return pos[0] >= bnds[0] and pos[0] + pos[2] <= bnds[2] and pos[1] >= bnds[1] and pos[1] +pos[3]<= bnds[3] 
-
-            height_min = 50
-            visiable_min = .65
-            pos = box['pos']
-            pos_v = box['posv']
-            occl = box['occl']
-            label = box["lbl"]
-        
-
-            pos_area = pos[2] * pos[3]
-
-      
-            if occl == 0 or not hasattr(pos_v, '__iter__') or all(x==0 for x in pos_v):
-
-                visiable_ratio = 1
-            else:
-                pos_v_area = pos_v[2] * pos_v[3]
-                visiable_ratio = (pos_v_area / pos_area)
-         
-            return verify_person_class(box) and visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos) 
-        
-        
-        verify_all = lambda box: True
+       
         
  
         
@@ -362,20 +382,23 @@ class caltech(imdb):
         #annotation = json.load(open(filename))
         set_num, v_num, frame_num = index.split("_")
         bboxes = self._annotation[set_num][v_num]["frames"][frame_num]
-        print(len(bboxes))
         
-        verify_methods = {"person_class_only":verify_person_class, "reasonable":verify_reasonable, "all": verify_all  }
+        
+        verify_methods = {"person_class_only":label_filter, "reasonable":reasonable_filter, "all": lambda box: True  }
         verify_method = verify_methods[self.version]
-        
+        original_len = len(bboxes)
         bboxes = [bbox for bbox in bboxes if verify_method(bbox) ]
-        if not verify_reasonable(bbox):
-            print("Filter out non {} boxes".format(self.version))
+        num_objs = len(bboxes)
+        if original_len > num_objs:
+            print("Filter out non {} {} boxes".format(original_len - num_objs, self.version))
+        #if not verify_reasonable(bbox):
+            #print("Filter out non {} boxes".format(self.version))
           
         
    
         
         
-        num_objs = len(bboxes)
+        
 
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
         gt_classes = np.zeros((num_objs), dtype=np.int32)
@@ -400,11 +423,13 @@ class caltech(imdb):
             y1 = float(bbox['pos'][1])
             x2 = float(bbox['pos'][0] + bbox['pos'][2])
             y2 = float(bbox['pos'][1] + bbox['pos'][3])
+            assert(self.version != "reasonable" or (y2 - y1) >= 50, \
+                   "Bounding box is too samll, Reasonable Filter is not working.")
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = 1  #Must be pedestrian
             overlaps[ix, cls] = 1.0
-            if (y2 - y1) < 50:
-                print("Oops!")
+            
+             
             seg_areas[ix] = (x2 - x1) * (y2 - y1)
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
