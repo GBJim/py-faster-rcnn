@@ -20,6 +20,9 @@ upper_bound = 50000
 
 
 
+
+
+
 for model in models:
     iterations = get_iterations(model)
     if iterations > lower_bound and iterations < upper_bound:
