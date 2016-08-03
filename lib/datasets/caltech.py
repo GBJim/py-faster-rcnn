@@ -466,10 +466,10 @@ class caltech(imdb):
             '''
             return [ atoi(c) for c in re.split('(\d+)', text) ]
         
-        def insert_frame(target_frames, file_path,start_frame=30, frame_rate=30):
+        def insert_frame(target_frames, file_path,start_frame=29, frame_rate=30):
             file_name = file_path.split("/")[-1]
             set_num, v_num, frame_num = file_name[:-4].split("_")
-            if int(frame_num) >= start_frame and int(frame_num) % frame_rate == 0:
+            if int(frame_num) >= start_frame and int(frame_num) % frame_rate == 29:
                 target_frames.setdefault(set_num,{}).setdefault(v_num,[]).append(file_path)
                 return 1
             else:
@@ -512,13 +512,15 @@ class caltech(imdb):
             for file_index, file_path in enumerate(file_list):
                 file_name = file_path.split("/")[-1]
                 set_num, v_num, frame_num = file_name[:-4].split("_")
+                frame_num = str(int(frame_num) +1)
                 
                 timer.tic()
                 dets = detect(file_path)
                
                 timer.toc()
                  
-                print('Detection Time:{:.3f}s  {}/{} images'.format(timer.average_time, current_frames+file_index+1 , total_frames))
+                print('Detection Time:{:.3f}s on {}  {}/{} images'.format(timer.average_time,\
+                                                       file_name ,current_frames+file_index+1 , total_frames))
                 
                              
                 inds = np.where(dets[:, -1] >= thresh)[0]     
