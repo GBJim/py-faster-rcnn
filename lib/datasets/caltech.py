@@ -6,8 +6,6 @@
 # --------------------------------------------------------
 
 #This is negative_ignore version of imdb class for Caltech Pedestrian dataset
-
-
 import re
 import os
 from datasets.imdb import imdb
@@ -132,8 +130,9 @@ class caltech(imdb):
         assert os.path.exists(annotation_path), \
                 'Annotation path does not exist.: {}'.format(annotation_path)
          
-
-        self._annotation = json.load(open(annotation_path))
+        anno_path = os.path.join(self._data_path, "annotations.json")
+        new_anno_path = os.path.join(self._data_path, "new_anno.json")
+        self._annotation = self.load_annotation(anno_path, new_anno_path)
         
         
         self._image_ext = '.jpg'
@@ -150,6 +149,36 @@ class caltech(imdb):
         #        'VOCdevkit path does not exist: {}'.format(self._devkit_path)
         assert os.path.exists(self._data_path), \
                 'Path does not exist: {}'.format(self._data_path)
+            
+            
+    def load_annotation(self, anno_path, new_anno_path):
+        
+       
+        assert os.path.exists(anno_path), \
+                'Annotation path does not exist.: {}'.format(anno_path)
+        annotation = json.load(open(anno_path))
+            
+      
+        assert os.path.exists(new_anno_path), \
+                'Annotation path does not exist.: {}'.format(new_anno_path)
+        new_anno = json.load(open(new_anno_path))
+        
+        replacing_count = 0
+        
+        for set_num, set_anno in new_anno.items():
+            for v_num, v_anno in set_anno.items():
+                for frame_name in v_anno["frames"]:
+                    annotation[set_num][v_num]["frames"][frame_name] = v_anno["frames"][frame_name]
+                    replacing_count += 1
+        
+        
+        print("{} frames of annotation are replaced by new annotaions".format(replacing_count))
+        return annotation
+        
+        
+        
+         
+        
 
     def image_path_at(self, i):
         """
@@ -231,6 +260,18 @@ class caltech(imdb):
         assert os.path.exists( image_path), \
                 'Path does not exist: {}'.format( image_path)
         image_index = []
+                
+       
+        
+        
+
+                        
+                      
+                        
+                        
+
+
+    
 
         print(image_set_list)
         
@@ -258,7 +299,19 @@ class caltech(imdb):
     
     
     
+                    
+       
+        
+        
+
+                        
+                      
+                        
+                        
+
+
     
+
 
     def _get_default_path(self):
         """
@@ -566,18 +619,6 @@ class caltech(imdb):
                 os.makedirs(target_path)
             for v_num, file_list in target_frames[set_num].items():
                 current_frames += detection_to_file(target_path, v_num, file_list, detect, total_frames, current_frames)
-                
-       
-        
-        
-
-                        
-                      
-                        
-                        
-
-
-    
 
  
 
