@@ -109,7 +109,7 @@ def reasonable_filter(box):
 
     return validity
 
-
+true_filter = lambda box: True
 
 
 
@@ -191,20 +191,7 @@ class caltech(imdb):
                      
         return image_index                   
                     
-      
-    def person_class_index(self, image_set_list):
-        image_index = self.all_index(image_set_list)
-        target_index = []
-        for image_name in image_index :
-            set_num, v_num, frame_num =  image_name.split("_")
-            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(box["lbl"] == "person" for box in boxes):
-                target_index.append(image_name)
-     
-                     
-        return target_index                   
-    
-    
+
     
     def reasonable_index(self, image_set_list):
         
@@ -247,16 +234,26 @@ class caltech(imdb):
 
         print(image_set_list)
         
-        
-	           
+            
                                 
-        method_mapper = {"reasonable":self.reasonable_index, "all": self.all_index, "person_class":\
-                         self.person_class_index}                        
+        filter_mapper = {"reasonable": reasonable_filter, "all": true_filter, "person_class":\
+                         label_filter}
+        
+        box_filter = filter_mapper[self.version]
                         
-        image_index = method_mapper[self.version](image_set_list)          
+        
+        all_index = self.all_index(image_set_list)
+        target_index = []
+
+        for image_name in all_index  :
+            set_num, v_num, frame_num =  image_name.split("_")
+            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
+            if any(box_filter(box) for box in boxes):
+                target_index.append(image_name)
+        
        
        
-        return image_index
+        return target_index
     
     
     
@@ -390,7 +387,7 @@ class caltech(imdb):
         bboxes = [bbox for bbox in bboxes if verify_method(bbox) ]
         num_objs = len(bboxes)
         if original_len > num_objs:
-            print("Filter out non {} {} boxes".format(original_len - num_objs, self.version))
+            print("Filter out {} non-{} boxes".format(original_len - num_objs, self.version))
         #if not verify_reasonable(bbox):
             #print("Filter out non {} boxes".format(self.version))
           
