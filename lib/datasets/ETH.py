@@ -30,91 +30,6 @@ from utils.timer import Timer
 import glob
 import cv2
 
-
-#Public functions:
-#For boxes with certain Label
-def label_filter(box, label="person"):
-    return box['lbl'] == label
-
-#For boxes with a specified boundry, the default values arefrom 
-def boundry_filter(box, bnds = {'xmin':5, 'ymin':5, 'xmax':635, 'ymax':475}):
-    x1 = box['pos'][0]
-    y1 = box['pos'][1]
-    width = box['pos'][2]
-    height = box['pos'][3]
-    x2 = x1 + width
-    y2 = y1 + height
-
-    validity =  x1 >= bnds['xmin'] and \
-                x2 <= bnds['xmax'] and \
-                y1 >= bnds['ymin'] and \
-                y2 <= bnds['ymax'] 
-
-    return validity
-
-#For boxes higher than a speifcied height
-def height_filter(box, height_range = {'min':50, 'max': float('inf')}):
-    height = box['pos'][3]
-    validity = height >= height_range['min'] and \
-               height < height_range['max']
-    return validity
-
-#For boxes more visible than a speifcied range
-def visibility_filter(box, visible_range = {'min': 0.65, 'max': float('inf')}):
-    occluded = box['occl']
-
-    #A dirty condition to deal with the ill-formatted data.
-    if occluded == 0 or \
-       not hasattr(box['posv'], '__iter__') or \
-       all([v==0 for v in box['posv']]):
-
-        visiable_ratio = 1
-
-    else:
-        width = box['pos'][2]
-        height = box['pos'][3]
-        area = width * height   
-
-        visible_width = box['posv'][2]
-        visible_height = box['posv'][3]
-        visible_area = visible_width * visible_height
-
-        visiable_ratio = visible_area / area
-
-
-
-    validity = visiable_ratio  >= visible_range['min'] and \
-           visiable_ratio  <= visible_range['max']
-
-    return validity
-
-
-
-
-
-    height = box['pos'][3]
-    validity = height >= height_range['min'] and \
-               height < height_range['max']
-    return validity
-
-
-
-
-def reasonable_filter(box):
-    label = "person"
-    validity = box['lbl'] == 'person' and\
-               boundry_filter(box) and\
-               height_filter(box) and \
-               visibility_filter(box)
-
-    return validity
-
-true_filter = lambda box: True
-
-
-
-
-
 class caltech(imdb):
     def __init__(self, version, image_set, devkit_path="caltech-pedestrian-dataset-converter"):
         imdb.__init__(self,'caltech_pedestrian_' + image_set)
@@ -144,7 +59,16 @@ class caltech(imdb):
         #
 
 
-    
+       
+        '''
+        # Caltech Pedestrain specific config options
+        self.config = {'cleanup'     : True,
+                       'use_salt'    : True,
+                       'use_diff'    : False,
+                       'matlab_eval' : False,
+                       'rpn_file'    : None,
+                       'min_size'    : 2}
+        '''
         #not usre if I should keep this line
         #assert os.path.exists(self._devkit_path), \
         #        'VOCdevkit path does not exist: {}'.format(self._devkit_path)
@@ -191,11 +115,50 @@ class caltech(imdb):
                      
         return image_index                   
                     
-
+      
+    def person_class_index(self, image_set_list):
+        image_index = self.all_index(image_set_list)
+        target_index = []
+        for image_name in image_index :
+            set_num, v_num, frame_num =  image_name.split("_")
+            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
+            if any(box["lbl"] == "person" for box in boxes):
+                target_index.append(image_name)
+     
+                     
+        return target_index                   
+    
+    
     
     def reasonable_index(self, image_set_list):
+        def verify_person_class(box):
+            return box['lbl'] == 'person'
+            
+           
+        def verify_reasonable(box):
+            def verity_bnds(pos):
+                bnds = [5, 5, 635, 475]
+                return pos[0] >= bnds[0] and pos[0] + pos[2] <= bnds[2] and pos[1] >= bnds[1] and pos[1] +pos[3]<= bnds[3] 
+
+            height_min = 50
+            visiable_min = .65
+            pos = box['pos']
+            pos_v = box['posv']
+            occl = box['occl']
+            label = box["lbl"]
         
-       
+
+            pos_area = pos[2] * pos[3]
+
+      
+            if occl == 0 or not hasattr(pos_v, '__iter__') or all(x==0 for x in pos_v):
+
+                visiable_ratio = 1
+            else:
+                pos_v_area = pos_v[2] * pos_v[3]
+                visiable_ratio = (pos_v_area / pos_area)
+         
+            return verify_person_class(box) and visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos) 
         
         
         image_index = self.person_class_index(image_set_list)
@@ -204,7 +167,7 @@ class caltech(imdb):
         for image_name in image_index :
             set_num, v_num, frame_num =  image_name.split("_")
             boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(reasonable_filter(box) for box in boxes):
+            if any(verify_reasonable(box) for box in boxes):
                 target_index.append(image_name)
         
   
@@ -234,26 +197,16 @@ class caltech(imdb):
 
         print(image_set_list)
         
-            
+        
+	           
                                 
-        filter_mapper = {"reasonable": reasonable_filter, "all": true_filter, "person_class":\
-                         label_filter}
-        
-        box_filter = filter_mapper[self.version]
+        method_mapper = {"reasonable":self.reasonable_index, "all": self.all_index, "person_class":\
+                         self.person_class_index}                        
                         
-        
-        all_index = self.all_index(image_set_list)
-        target_index = []
-
-        for image_name in all_index  :
-            set_num, v_num, frame_num =  image_name.split("_")
-            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(box_filter(box) for box in boxes):
-                target_index.append(image_name)
-        
+        image_index = method_mapper[self.version](image_set_list)          
        
        
-        return target_index
+        return image_index
     
     
     
@@ -363,7 +316,37 @@ class caltech(imdb):
         
         
         
-       
+        def verify_person_class(box):
+            return box['lbl'] == 'person'
+            
+    
+        def verify_reasonable(box):
+            def verity_bnds(pos):
+                bnds = [5, 5, 635, 475]
+                return pos[0] >= bnds[0] and pos[0] + pos[2] <= bnds[2] and pos[1] >= bnds[1] and pos[1] +pos[3]<= bnds[3] 
+
+            height_min = 50
+            visiable_min = .65
+            pos = box['pos']
+            pos_v = box['posv']
+            occl = box['occl']
+            label = box["lbl"]
+        
+
+            pos_area = pos[2] * pos[3]
+
+      
+            if occl == 0 or not hasattr(pos_v, '__iter__') or all(x==0 for x in pos_v):
+
+                visiable_ratio = 1
+            else:
+                pos_v_area = pos_v[2] * pos_v[3]
+                visiable_ratio = (pos_v_area / pos_area)
+         
+            return verify_person_class(box) and visiable_ratio > visiable_min and pos[3] > height_min and verity_bnds(pos) 
+        
+        
+        verify_all = lambda box: True
         
  
         
@@ -379,23 +362,20 @@ class caltech(imdb):
         #annotation = json.load(open(filename))
         set_num, v_num, frame_num = index.split("_")
         bboxes = self._annotation[set_num][v_num]["frames"][frame_num]
+        print(len(bboxes))
         
-        
-        verify_methods = {"person_class_only":label_filter, "reasonable":reasonable_filter, "all": lambda box: True  }
+        verify_methods = {"person_class_only":verify_person_class, "reasonable":verify_reasonable, "all": verify_all  }
         verify_method = verify_methods[self.version]
-        original_len = len(bboxes)
+        
         bboxes = [bbox for bbox in bboxes if verify_method(bbox) ]
-        num_objs = len(bboxes)
-        if original_len > num_objs:
-            print("Filter out {} non-{} boxes".format(original_len - num_objs, self.version))
-        #if not verify_reasonable(bbox):
-            #print("Filter out non {} boxes".format(self.version))
+        if not verify_reasonable(bbox):
+            print("Filter out non {} boxes".format(self.version))
           
         
    
         
         
-        
+        num_objs = len(bboxes)
 
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
         gt_classes = np.zeros((num_objs), dtype=np.int32)
@@ -420,13 +400,11 @@ class caltech(imdb):
             y1 = float(bbox['pos'][1])
             x2 = float(bbox['pos'][0] + bbox['pos'][2])
             y2 = float(bbox['pos'][1] + bbox['pos'][3])
-            assert(self.version != "reasonable" or (y2 - y1) >= 50, \
-                   "Bounding box is too samll, Reasonable Filter is not working.")
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = 1  #Must be pedestrian
             overlaps[ix, cls] = 1.0
-            
-             
+            if (y2 - y1) < 50:
+                print("Oops!")
             seg_areas[ix] = (x2 - x1) * (y2 - y1)
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
@@ -463,10 +441,10 @@ class caltech(imdb):
             '''
             return [ atoi(c) for c in re.split('(\d+)', text) ]
         
-        def insert_frame(target_frames, file_path,start_frame=29, frame_rate=30):
+        def insert_frame(target_frames, file_path,start_frame=30, frame_rate=30):
             file_name = file_path.split("/")[-1]
             set_num, v_num, frame_num = file_name[:-4].split("_")
-            if int(frame_num) >= start_frame and int(frame_num) % frame_rate == 29:
+            if int(frame_num) >= start_frame and int(frame_num) % frame_rate == 0:
                 target_frames.setdefault(set_num,{}).setdefault(v_num,[]).append(file_path)
                 return 1
             else:
@@ -509,15 +487,13 @@ class caltech(imdb):
             for file_index, file_path in enumerate(file_list):
                 file_name = file_path.split("/")[-1]
                 set_num, v_num, frame_num = file_name[:-4].split("_")
-                frame_num = str(int(frame_num) +1)
                 
                 timer.tic()
                 dets = detect(file_path)
                
                 timer.toc()
                  
-                print('Detection Time:{:.3f}s on {}  {}/{} images'.format(timer.average_time,\
-                                                       file_name ,current_frames+file_index+1 , total_frames))
+                print('Detection Time:{:.3f}s  {}/{} images'.format(timer.average_time, current_frames+file_index+1 , total_frames))
                 
                              
                 inds = np.where(dets[:, -1] >= thresh)[0]     
@@ -572,14 +548,91 @@ class caltech(imdb):
         
 
                         
-                      
                         
                         
+                        
+                        
+                        
 
+    def _do_python_eval(self, output_dir = 'output'):
+        annopath = os.path.join(
+            self._devkit_path,
+            'VOC' + self._year,
+            'Annotations',
+            '{:s}.xml')
+        imagesetfile = os.path.join(
+            self._devkit_path,
+            'VOC' + self._year,
+            'ImageSets',
+            'Main',
+            self._image_set + '.txt')
+        cachedir = os.path.join(self._devkit_path, 'annotations_cache')
+        aps = []
+        # The PASCAL VOC metric changed in 2010
+        use_07_metric = True if int(self._year) < 2010 else False
+        print 'VOC07 metric? ' + ('Yes' if use_07_metric else 'No')
+        if not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
+        for i, cls in enumerate(self._classes):
+            if cls == '__background__':
+                continue
+            filename = self._get_voc_results_file_template().format(cls)
+            rec, prec, ap = voc_eval(
+                filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
+                use_07_metric=use_07_metric)
+            aps += [ap]
+            print('AP for {} = {:.4f}'.format(cls, ap))
+            with open(os.path.join(output_dir, cls + '_pr.pkl'), 'w') as f:
+                cPickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+        print('Mean AP = {:.4f}'.format(np.mean(aps)))
+        print('~~~~~~~~')
+        print('Results:')
+        for ap in aps:
+            print('{:.3f}'.format(ap))
+        print('{:.3f}'.format(np.mean(aps)))
+        print('~~~~~~~~')
+        print('')
+        print('--------------------------------------------------------------')
+        print('Results computed with the **unofficial** Python eval code.')
+        print('Results should be very close to the official MATLAB eval code.')
+        print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
+        print('-- Thanks, The Management')
+        print('--------------------------------------------------------------')
 
-    
+    def _do_matlab_eval(self, output_dir='output'):
+        print '-----------------------------------------------------'
+        print 'Computing results with the official MATLAB eval code.'
+        print '-----------------------------------------------------'
+        path = os.path.join(cfg.ROOT_DIR, 'lib', 'datasets',
+                            'VOCdevkit-matlab-wrapper')
+        cmd = 'cd {} && '.format(path)
+        cmd += '{:s} -nodisplay -nodesktop '.format(cfg.MATLAB)
+        cmd += '-r "dbstop if error; '
+        cmd += 'voc_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\'); quit;"' \
+               .format(self._devkit_path, 
+                       self._image_set, output_dir)
+        print('Running:\n{}'.format(cmd))
+        status = subprocess.call(cmd, shell=True)
 
- 
+    def evaluate_detections(self, all_boxes, output_dir):
+        self._write_caltech_results_file(all_boxes)
+        self._do_python_eval(output_dir)
+        if self.config['matlab_eval']:
+            self._do_matlab_eval(output_dir)
+        if self.config['cleanup']:
+            for cls in self._classes:
+                if cls == '__background__':
+                    continue
+                filename = self._get_voc_results_file_template().format(cls)
+                os.remove(filename)
+
+    def competition_mode(self, on):
+        if on:
+            self.config['use_salt'] = False
+            self.config['cleanup'] = False
+        else:
+            self.config['use_salt'] = True
+            self.config['cleanup'] = True
 
 if __name__ == '__main__':
     from datasets.pascal_voc import caltech
