@@ -87,9 +87,6 @@ def visibility_filter(box, visible_range = {'min': 0.65, 'max': float('inf')}):
     return validity
 
 
-
-
-
     height = box['pos'][3]
     validity = height >= height_range['min'] and \
                height < height_range['max']
@@ -108,8 +105,6 @@ def reasonable_filter(box):
     return validity
 
 true_filter = lambda box: True
-
-
 
 
 
@@ -139,14 +134,8 @@ class caltech(imdb):
         self._image_index = self._load_image_set_index()
         # Default to roidb handler
         self._roidb_handler = self.selective_search_roidb
-        self._salt = str(uuid.uuid4())
-        #
-
-
-    
-        #not usre if I should keep this line
-        #assert os.path.exists(self._devkit_path), \
-        #        'VOCdevkit path does not exist: {}'.format(self._devkit_path)
+ 
+     
         assert os.path.exists(self._data_path), \
                 'Path does not exist: {}'.format(self._data_path)
             
@@ -169,15 +158,12 @@ class caltech(imdb):
             for v_num, v_anno in set_anno.items():
                 for frame_name in v_anno["frames"]:
                     annotation[set_num][v_num]["frames"][frame_name] = v_anno["frames"][frame_name]
+                    print(v_anno["frames"][frame_name])
                     replacing_count += 1
         
         
         print("{} frames of annotation are replaced by new annotaions".format(replacing_count))
         return annotation
-        
-        
-        
-         
         
 
     def image_path_at(self, i):
@@ -196,7 +182,7 @@ class caltech(imdb):
         assert os.path.exists(image_path), \
                 'Path does not exist: {}'.format(image_path)
         return image_path
-#Strategy: get the index from annotation dictionary 
+
     
    
     def _load_image_set_list(self):
@@ -221,28 +207,6 @@ class caltech(imdb):
         return image_index                   
                     
 
-    
-    def reasonable_index(self, image_set_list):
-        
-       
-        
-        
-        image_index = self.person_class_index(image_set_list)
-        target_index = []
-
-        for image_name in image_index :
-            set_num, v_num, frame_num =  image_name.split("_")
-            boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(reasonable_filter(box) for box in boxes):
-                target_index.append(image_name)
-        
-  
-        
-
-        
-                                
-        return target_index                   
-                    
         
 
     def _load_image_set_index(self):
@@ -260,32 +224,15 @@ class caltech(imdb):
         assert os.path.exists( image_path), \
                 'Path does not exist: {}'.format( image_path)
         image_index = []
-                
-       
-        
-        
-
-                        
-                      
-                        
-                        
-
-
-    
-
+  
         print(image_set_list)
-        
-            
+  
                                 
         filter_mapper = {"reasonable": reasonable_filter, "all": true_filter, "person_class":\
                          label_filter}
-        
-        box_filter = filter_mapper[self.version]
-                        
-        
+        box_filter = filter_mapper[self.version] 
         all_index = self.all_index(image_set_list)
         target_index = []
-
         for image_name in all_index  :
             set_num, v_num, frame_num =  image_name.split("_")
             boxes = self._annotation[set_num][v_num]["frames"][frame_num]
@@ -295,21 +242,6 @@ class caltech(imdb):
        
        
         return target_index
-    
-    
-    
-    
-                    
-       
-        
-        
-
-                        
-                      
-                        
-                        
-
-
     
 
 
@@ -405,24 +337,12 @@ class caltech(imdb):
             box_list.append(boxes)
 
         return self.create_roidb_from_box_list(box_list, gt_roidb)
-    
-
-  
-    
+ 
     
     
     #Assign negtaive example to __background__ as whole image
     def _load_caltech_annotation(self, index):
-        
-        
-        
-       
-        
- 
-        
-           
-    
-    
+      
 
         """
         Load image and bounding boxes info from XML file in the PASCAL VOC
@@ -444,10 +364,7 @@ class caltech(imdb):
         #if not verify_reasonable(bbox):
             #print("Filter out non {} boxes".format(self.version))
           
-        
-   
-        
-        
+    
         
 
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
@@ -459,10 +376,6 @@ class caltech(imdb):
         # Load object bounding boxes into a data frame.
         
 
-     
-
-        # 
-    
 
         cls = 1
         # This is possitive example
@@ -491,14 +404,7 @@ class caltech(imdb):
                 'seg_areas' : seg_areas}
 
 
-    def _get_caltech_results_file_template(self):
-        # VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
-        filename = self._salt + self._image_set + '_{:s}.txt'
-        path = os.path.join(
-            self._devkit_path,
-            'results',
-            filename)
-        return path
+
     # This method write results files into Evaluation toolkit format
     def _write_caltech_results_file(self, net):
          
@@ -527,13 +433,7 @@ class caltech(imdb):
        
         
        
-        
-            
-            
-        
-        
-        
-                    
+     
           
         def detect(file_path,  NMS_THRESH = 0.3):
             im = cv2.imread(file_path)
