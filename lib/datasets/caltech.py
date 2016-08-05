@@ -593,7 +593,7 @@ class caltech(imdb):
             
                         
         model_name = net.name
-        output_path = os.path.join(self._data_path,"res" , self.version, model_name)
+        output_path = os.path.join(self._data_path,"res" ,"new_annotation", self.version, model_name)
         if not os.path.exists(output_path):
             os.makedirs(output_path)       
             
