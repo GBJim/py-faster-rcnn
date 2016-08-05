@@ -297,21 +297,11 @@ layer {
   bottom: "conv4_3"
   top: "conv4_3"
 }
-layer {
-  name: "pool4"
-  type: "Pooling"
-  bottom: "conv4_3"
-  top: "pool4"
-  pooling_param {
-    pool: MAX
-    kernel_size: 2
-    stride: 2
-  }
-}
+
 layer {
   name: "conv5_1"
   type: "Convolution"
-  bottom: "pool4"
+  bottom: "conv4_3"
   top: "conv5_1"
   param {
     lr_mult: 1
@@ -323,8 +313,10 @@ layer {
   }
   convolution_param {
     num_output: 512
-    pad: 1
+    pad: 2
     kernel_size: 3
+    dilation: 2
+    
   }
 }
 layer {
@@ -348,8 +340,9 @@ layer {
   }
   convolution_param {
     num_output: 512
-    pad: 1
+    pad: 2
     kernel_size: 3
+    dilation: 2
   }
 }
 layer {
@@ -373,8 +366,9 @@ layer {
   }
   convolution_param {
     num_output: 512
-    pad: 1
+    pad: 2
     kernel_size: 3
+    dilation: 2
   }
 }
 layer {
@@ -468,7 +462,7 @@ layer {
   python_param {
     module: 'rpn.proposal_layer'
     layer: 'ProposalLayer'
-    param_str: "'feat_stride': 16"
+    param_str: "'feat_stride': 8"
   }
 }
 
@@ -483,7 +477,7 @@ layer {
   roi_pooling_param {
     pooled_w: 7
     pooled_h: 7
-    spatial_scale: 0.0625 # 1/16
+    spatial_scale: 0.125 # 1/8
   }
 }
 layer {
