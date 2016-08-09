@@ -27,6 +27,81 @@ from fast_rcnn.nms_wrapper import nms
 from utils.timer import Timer
 import glob
 import cv2
+from operator import itemgetter
+
+
+def get_overlap_area(box_a, box_b):
+    x1_a, y1_a, width_a, height_a = box_a['pos']
+    x1_b, y1_b, width_b, height_b = box_b['pos']
+
+    x2_a = x1_a + width_a
+    y2_a = y1_a + height_a
+    x2_b = x1_b + width_b
+    y2_b = y1_b + height_b
+
+    #get the width and height of overlap rectangle
+    overlap_width =  min(x2_a, x2_b) - max(x1_a, x1_b) 
+    overlap_height = min(y2_a, y2_b) - max(y1_a, y1_b) 
+
+    #If the width or height of overlap rectangle is negative, it implies that two rectangles does not overlap.
+    if overlap_width > 0 and overlap_height > 0:
+        return overlap_width * overlap_height
+    else:
+        return 0
+    
+def get_IOU(box_a, box_b):
+
+    overlap_area = get_overlap_area(box_a, box_b)
+
+    #Union = A + B - I(A&B)
+    area_a = box_a['pos'][2] * box_a['pos'][3]
+    area_b = box_b['pos'][2] * box_b['pos'][3]
+    union_area = area_a + area_b - overlap_area
+
+
+    if overlap_area > 0 :
+        return union_area / overlap_area
+    else:
+        return 0
+
+def get_max_IOU(box, mateched_boxes):
+    return max([(i, get_IOU(box, matched_box)) for matched_box in mateched_boxes],key=itemgetter(1))
+
+def merge_boxes(old_boxes, new_boxes, IOU_thresh = 0.7):
+    if len(old_boxes) > 0 and len(new_boxes) > 0:
+        IOU_table = np.zeros((len(old_boxes), len(new_boxes)),dtype=float)
+        merged_boxes = []
+       
+        #Fill the IOU values into IOU tables 
+        for i, old_box in enumerate(old_boxes):
+            for j, new_box in enumerate(new_boxes):
+                IOU_table[i, j] = get_IOU(old_box, new_box)
+        merge_count = 0
+        #Filling old or new box into merged boxes
+        for i, old_box in enumerate(old_boxes):
+            #Find the best match of i-th old_box
+            matched_index = np.argmax(IOU_table[i,:])
+            merge_box = old_boxes[i]
+                
+            #Check if i-th old box is also the strongest match of the matched new box
+            if i == np.argmax(IOU_table[:,matched_index]):
+                merge_box['pos'] = new_boxes[matched_index]['pos']
+                merge_count += 1
+             
+            merged_boxes.append(merge_box)
+         
+              
+        print("{} boxes are merged".format(merge_count))
+        return merged_boxes
+            
+        
+        
+    else:
+        return []
+        
+        
+        
+        
 
 
 #Public functions:
@@ -121,12 +196,10 @@ class caltech(imdb):
         self._classes = ('__background__', # always index 0
                          'person')
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
-        annotation_path = os.path.join(self._data_path, "annotations.json")
-        assert os.path.exists(annotation_path), \
-                'Annotation path does not exist.: {}'.format(annotation_path)
+       
          
         anno_path = os.path.join(self._data_path, "annotations.json")
-        new_anno_path = os.path.join(self._data_path, "new_anno.json")
+        new_anno_path = os.path.join(self._data_path, "new_anno_10x.json")
         self._annotation = self.load_annotation(anno_path, new_anno_path)
         
         
@@ -154,15 +227,31 @@ class caltech(imdb):
         
         replacing_count = 0
         
+                                 
+        filter_mapper = {"reasonable": reasonable_filter, "all": true_filter, "person_class":\
+                         label_filter}
+        box_filter = filter_mapper[self.version] 
+        
+        
         for set_num, set_anno in new_anno.items():
             for v_num, v_anno in set_anno.items():
-                for frame_name in v_anno["frames"]:
-                    annotation[set_num][v_num]["frames"][frame_name] = v_anno["frames"][frame_name]
-                    print(v_anno["frames"][frame_name])
-                    replacing_count += 1
+                for frame_name, new_boxes in v_anno["frames"].items():
+                    old_boxes = annotation[set_num][v_num]["frames"] .get(frame_name, [])
+                    old_boxes = [old_box for old_box in old_boxes if box_filter(old_box)]
+                    #annotation[set_num][v_num]["frames"][frame_name] = v_anno["frames"][frame_name]
+                    merged_boxes = merge_boxes(old_boxes, new_boxes)
+                    
+                    if merged_boxes:
+                        replacing_count += 1
+                        
+                    annotation[set_num][v_num]["frames"][frame_name] = merged_boxes
+                        
+                    
+                    
+                    
         
         
-        print("{} frames of annotation are replaced by new annotaions".format(replacing_count))
+        print("{} frames of annotation are merged with new annotaions 10X".format(replacing_count))
         return annotation
         
 
@@ -236,7 +325,7 @@ class caltech(imdb):
         for image_name in all_index  :
             set_num, v_num, frame_num =  image_name.split("_")
             boxes = self._annotation[set_num][v_num]["frames"][frame_num]
-            if any(box_filter(box) for box in boxes):
+            if boxes:
                 target_index.append(image_name)
         
        
@@ -348,8 +437,8 @@ class caltech(imdb):
         Load image and bounding boxes info from XML file in the PASCAL VOC
         format.
         """
-        filename = os.path.join(self._data_path, "annotation.json")
-        #annotation = json.load(open(filename))
+        
+       
         set_num, v_num, frame_num = index.split("_")
         bboxes = self._annotation[set_num][v_num]["frames"][frame_num]
         
@@ -357,10 +446,10 @@ class caltech(imdb):
         verify_methods = {"person_class_only":label_filter, "reasonable":reasonable_filter, "all": lambda box: True  }
         verify_method = verify_methods[self.version]
         original_len = len(bboxes)
-        bboxes = [bbox for bbox in bboxes if verify_method(bbox) ]
+        #bboxes = [bbox for bbox in bboxes if verify_method(bbox) ]
         num_objs = len(bboxes)
-        if original_len > num_objs:
-            print("Filter out {} non-{} boxes".format(original_len - num_objs, self.version))
+        #if original_len > num_objs:
+            #print("Filter out {} non-{} boxes".format(original_len - num_objs, self.version))
         #if not verify_reasonable(bbox):
             #print("Filter out non {} boxes".format(self.version))
           
